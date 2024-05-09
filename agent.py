@@ -2,12 +2,22 @@ import numpy as np
 from game import Board, UP, RIGHT, DOWN, LEFT, action_name
 from game import IllegalAction, GameOver
 
+from model import Model2048
+import torch
+
+DEVICE = "cuda:0"
 
 class nTupleNewrok:
     def __init__(self, tuples):
         self.TUPLES = tuples
         self.TARGET_PO2 = 15
         self.LUTS = self.initialize_LUTS(self.TUPLES)
+        self.model = Model2048(_tuple_len = 4, _num_tuples = 17).to(DEVICE)
+        #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-5)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-2)
+        self.criterion = torch.nn.MSELoss()
+        self.LOSSES = []
+    
 
     def initialize_LUTS(self, tuples):
         LUTS = []
@@ -25,6 +35,7 @@ class nTupleNewrok:
                     "digit %d should be smaller than the base %d" % (v, self.TARGET_PO2)
                 )
             n += v * k
+            
             k *= self.TARGET_PO2
         return n
 
@@ -32,19 +43,27 @@ class nTupleNewrok:
         """Return the expected total future rewards of the board.
         Updates the LUTs if a delta is given and return the updated value.
         """
+        
+        #print(type(board), len(board)) ## 16
+        #print(board) ## [1,2,0,3,1,0,5,7,...]
+        
         if debug:
             print(f"V({board})")
         vals = []
-        for i, (tp, LUT) in enumerate(zip(self.TUPLES, self.LUTS)):
-            tiles = [board[i] for i in tp]
+        LUTS = []
+        for tp in self.TUPLES:
+            LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
+            
+        for i, (tp, LUT) in enumerate(zip(self.TUPLES, LUTS)):
+            tiles = [board[ii] for ii in tp]
             tpid = self.tuple_id(tiles)
-            if delta is not None:
-                LUT[tpid] += delta
-            v = LUT[tpid]
-            if debug:
-                print(f"LUTS[{i}][{tiles}]={v}")
-            vals.append(v)
-        return np.mean(vals)
+            LUT[tpid] = 1
+            
+        LUTS = torch.cat([torch.tensor(lut) for lut in LUTS], dim=0)
+        logits = self.model(LUTS.to(DEVICE))
+        
+            
+        return logits
 
     def evaluate(self, s, a):
         "Return expected total rewards of performing action (a) on the given board state (s)"
@@ -54,7 +73,9 @@ class nTupleNewrok:
             s_after = b.copyboard()
         except IllegalAction:
             return 0
-        return r + self.V(s_after)
+        
+        #print(self.V(s_after).shape, self.V(s_after))
+        return r + self.V(s_after)[0]
 
     def best_action(self, s):
         "returns the action with the highest expected total rewards on the state (s)"
@@ -67,7 +88,7 @@ class nTupleNewrok:
                 a_best = a
         return a_best
 
-    def learn(self, s, a, r, s_after, s_next, alpha=0.01, debug=False):
+    def learn(self, total_steps, s, a, r, s_after, s_next, alpha=0.01, debug=False):
         """Learn from a transition experience by updating the belief
         on the after state (s_after) towards the sum of the next transition rewards (r_next) and
         the belief on the next after state (s_after_next).
@@ -83,7 +104,21 @@ class nTupleNewrok:
             r_next = 0
             v_after_next = 0
 
-        delta = r_next + v_after_next - self.V(s_after)
+        #delta = r_next + v_after_next - self.V(s_after)
+        
+        logits = self.V(s_after)
+        loss = self.criterion(logits.float(), torch.tensor(r_next + v_after_next).float().to(DEVICE))
+        self.LOSSES.append(loss)
+        
+        self.optimizer.zero_grad()
+        loss.backward()
+        for param in self.model.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.optimizer.step()
+        
+        if total_steps % 100 == 0:
+            print(f"mean loss : {torch.mean(torch.tensor(self.LOSSES))}")
+            self.LOSSES = []
 
         if debug:
             print("s_next")
@@ -91,11 +126,11 @@ class nTupleNewrok:
             print("a_next", action_name(a_next), "r_next", r_next)
             print("s_after_next")
             Board(s_after_next).display()
-            self.V(s_after_next, debug=True)
-            print(
-                f"delta ({delta:.2f}) = r_next ({r_next:.2f}) + v_after_next ({v_after_next:.2f}) - V(s_after) ({V(s_after):.2f})"
-            )
-            print(
-                f"V(s_after) <- V(s_after) ({V(s_after):.2f}) + alpha * delta ({alpha} * {delta:.1f})"
-            )
-        self.V(s_after, alpha * delta)
+            #self.V(s_after_next, debug=True)
+            #print(
+            #    f"delta ({delta:.2f}) = r_next ({r_next:.2f}) + v_after_next ({v_after_next:.2f}) - V(s_after) ({V(s_after):.2f})"
+            #)
+            #print(
+            #    f"V(s_after) <- V(s_after) ({V(s_after):.2f}) + alpha * delta ({alpha} * {delta:.1f})"
+            #)
+        #self.V(s_after, alpha * delta)

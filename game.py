@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import math
 
 UP = 0
 RIGHT = 1
@@ -115,9 +116,9 @@ class Board:
             r = self.rotate().merge_to_left()
             self.rotate().rotate().rotate()
         if original == self.board:
-            #raise IllegalAction("Action did not move any tile.")
-            return 0
-        return r
+            raise IllegalAction("Action did not move any tile.")
+            #return 0
+        return math.log(r+1)
 
     def rotate(self):
         "Rotate the board inplace 90 degress clockwise."

@@ -2,6 +2,10 @@ import numpy as np
 from game import Board
 from game import IllegalAction, GameOver
 from agent import nTupleNewrok
+from model import Model2048
+
+from tqdm import tqdm
+
 import pickle
 import time
 
@@ -24,10 +28,8 @@ keymap = {0:"↑", 1: "→", 2: "↓" , 3:"←"}
 def play(agent, board, spawn_random_tile=True):
     "Return a gameplay of playing the given (board) until terminal states."
     
-    # remove
-    spawn_random_tile = False
     
-    
+    total_steps = 0
     b = Board(board)
     r_game = 0
     a_cnt = 0
@@ -37,6 +39,7 @@ def play(agent, board, spawn_random_tile=True):
         a_best = agent.best_action(b.board)
         s = b.copyboard()
         try:
+            total_steps += 1
             r = b.act(a_best)
             #print(f"Pressed Key to Act :  {keymap[a_best]}")
             r_game += r
@@ -66,8 +69,8 @@ def play(agent, board, spawn_random_tile=True):
 
 def learn_from_gameplay(agent, gp, alpha=0.1):
     "Learn transitions in reverse order except the terminal transition"
-    for tr in gp.transition_history[:-1][::-1]:
-        agent.learn(tr.s, tr.a, tr.r, tr.s_after, tr.s_next, alpha=alpha)
+    for i_step, tr in enumerate(gp.transition_history[:-1][::-1]):
+        agent.learn(i_step, tr.s, tr.a, tr.r, tr.s_after, tr.s_next, alpha=alpha)
 
 
 def load_agent(path):
@@ -123,13 +126,17 @@ if __name__ == "__main__":
         n_games = 0
         agent = nTupleNewrok(TUPLES)
 
-    n_session = 5000
-    n_episode = 100
+
+
+    #n_session = 5000
+    n_session = 50000
+    #n_episode = 100
+    n_episode = 10
     print("training")
     try:
         for i_se in range(n_session):
             gameplays = []
-            for i_ep in range(n_episode):
+            for i_ep in tqdm(range(n_episode)):
                 gp = play(agent, None, spawn_random_tile=True)
                 gameplays.append(gp)
                 n_games += 1
