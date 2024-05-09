@@ -23,6 +23,11 @@ keymap = {0:"↑", 1: "→", 2: "↓" , 3:"←"}
 
 def play(agent, board, spawn_random_tile=True):
     "Return a gameplay of playing the given (board) until terminal states."
+    
+    # remove
+    spawn_random_tile = False
+    
+    
     b = Board(board)
     r_game = 0
     a_cnt = 0
