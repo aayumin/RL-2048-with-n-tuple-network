@@ -14,7 +14,7 @@ class nTupleNewrok:
         self.LUTS = self.initialize_LUTS(self.TUPLES)
         self.model = Model2048(_tuple_len = 4, _num_tuples = 17).to(DEVICE)
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-5)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-2)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.criterion = torch.nn.MSELoss()
         self.LOSSES = []
     
