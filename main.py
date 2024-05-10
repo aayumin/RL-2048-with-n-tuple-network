@@ -2,7 +2,6 @@ import numpy as np
 from game import Board
 from game import IllegalAction, GameOver
 from agent import nTupleNewrok
-from model import Model2048
 
 from tqdm import tqdm
 
@@ -25,24 +24,25 @@ Gameplay = namedtuple("Gameplay", "transition_history game_reward max_tile")
 
 keymap = {0:"↑", 1: "→", 2: "↓" , 3:"←"}
 
-def play(agent, board, spawn_random_tile=True):
+def play(agent, board, ep_idx, total_steps, spawn_random_tile=True):
     "Return a gameplay of playing the given (board) until terminal states."
     
     
-    total_steps = 0
     b = Board(board)
     r_game = 0
-    a_cnt = 0
     transition_history = []
     while True:
         #time.sleep(0.2)
-        a_best = agent.best_action(b.board)
+        a_best, epsilon = agent.best_action(b.board, ep_idx)
         s = b.copyboard()
+        #if (total_steps+1) % 1000 == 0: print(f"epsilon : {epsilon}")
         try:
             total_steps += 1
             r = b.act(a_best)
             #print(f"Pressed Key to Act :  {keymap[a_best]}")
             r_game += r
+            #print(f"r: {r}")
+            #r_game = max(r_game, r)
             s_after = b.copyboard()
             status = b.spawn_tile(random_tile=spawn_random_tile)
             s_next = b.copyboard()
@@ -54,7 +54,6 @@ def play(agent, board, spawn_random_tile=True):
             s_next = None
             break
         finally:
-            a_cnt += 1
             transition_history.append(
                 Transition(s=s, a=a_best, r=r, s_after=s_after, s_next=s_next)
             )
@@ -63,14 +62,16 @@ def play(agent, board, spawn_random_tile=True):
         game_reward=r_game,
         max_tile=2 ** max(b.board),
     )
-    learn_from_gameplay(agent, gp)
-    return gp
+    
+    learn_from_gameplay(agent, gp, ep_idx, total_steps)
+    return gp, total_steps
 
 
-def learn_from_gameplay(agent, gp, alpha=0.1):
+def learn_from_gameplay(agent, gp, ep_idx, total_steps, alpha=0.1):
     "Learn transitions in reverse order except the terminal transition"
     for i_step, tr in enumerate(gp.transition_history[:-1][::-1]):
-        agent.learn(i_step, tr.s, tr.a, tr.r, tr.s_after, tr.s_next, alpha=alpha)
+        total_steps += 1
+        agent.learn(ep_idx, total_steps, tr.s, tr.a, tr.r, tr.s_after, tr.s_next, alpha=alpha)
 
 
 def load_agent(path):
@@ -134,10 +135,11 @@ if __name__ == "__main__":
     n_episode = 10
     print("training")
     try:
+        total_steps = 0
         for i_se in range(n_session):
             gameplays = []
-            for i_ep in tqdm(range(n_episode)):
-                gp = play(agent, None, spawn_random_tile=True)
+            for i_ep in range(n_episode):
+                gp, total_steps = play(agent, None, ep_idx = i_se, total_steps=total_steps, spawn_random_tile=True)
                 gameplays.append(gp)
                 n_games += 1
             n2048 = sum([1 for gp in gameplays if gp.max_tile == 2048])
@@ -157,3 +159,6 @@ if __name__ == "__main__":
             fout = "tmp/{}_{}games.pkl".format(agent.__class__.__name__, n_games)
             pickle.dump((n_games, agent), open(fout, "wb"))
             print("agent saved to", fout)
+    except Exception as e:
+        print(e)
+    

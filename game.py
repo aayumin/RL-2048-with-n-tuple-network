@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import math
+import torch
 
 UP = 0
 RIGHT = 1
@@ -37,6 +38,7 @@ def merge(row):
         if hold != -1:
             if hold == v:
                 reward = reward + (2 ** (hold + 1))
+                #reward = reward + (hold + 1)
                 r.append(hold + 1)
                 hold = -1
             else:
@@ -118,7 +120,8 @@ class Board:
         if original == self.board:
             raise IllegalAction("Action did not move any tile.")
             #return 0
-        return math.log(r+1)
+        #print(r)
+        return torch.tensor(math.log(r+1))
 
     def rotate(self):
         "Rotate the board inplace 90 degress clockwise."
