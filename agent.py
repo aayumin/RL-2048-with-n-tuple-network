@@ -17,7 +17,7 @@ class nTupleNewrok:
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-5)
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-2)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-1)
         self.criterion = torch.nn.MSELoss()
         self.LOSSES = []
     
