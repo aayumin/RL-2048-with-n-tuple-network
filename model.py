@@ -24,14 +24,15 @@ def init_weights(m):
         
 class Model2048(nn.Module):
 
-    def __init__(self, _tuple_len = 4, _num_tuples = 17, max_values = 16, ACTION_SPACE=4, pretrained=False):
+    def __init__(self, _total_tuple_len = 4 * 17, _num_tuples = 17, max_values = 16, ACTION_SPACE=4, pretrained=False):
         super(Model2048, self).__init__()
         
         
-        tuple_len = _tuple_len
+        total_tuple_len = _total_tuple_len
         num_tuples = _num_tuples
         
-        self.Input_dim = int(num_tuples * (max_values * tuple_len))
+        #self.Input_dim = int(num_tuples * (max_values * tuple_len))
+        self.Input_dim = int(max_values * total_tuple_len)
         self.H_dim1 = 64
         #self.H_dim2 = 32
         self.H_dim2 = 128
@@ -48,12 +49,15 @@ class Model2048(nn.Module):
             #nn.ReLU(),
             nn.Linear(self.H_dim2, ACTION_SPACE),
             #nn.Linear(self.H_dim2, 1),
-            nn.Sigmoid(),
+            #nn.Sigmoid(), ## TODO
             #nn.ReLU(),
         )
         self.FC.apply(init_weights)
         
     def forward(self, x):
+        VALUE_MAX = 10.0
         y = self.FC(x.reshape((-1, self.Input_dim)).float())
+        #y = self.FC(x.reshape((-1, self.Input_dim)).float()) * VALUE_MAX
+        y = 1 / (1 + torch.exp(0.05 * -1 * y)) * VALUE_MAX
         return y
 

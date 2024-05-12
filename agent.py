@@ -13,10 +13,11 @@ class nTupleNewrok:
         self.TUPLES = tuples
         self.TARGET_PO2 = 15
         #self.LUTS = self.initialize_LUTS(self.TUPLES)
-        self.model = Model2048(_tuple_len = 4, _num_tuples = 17).to(DEVICE)
+        self.model = Model2048(_total_tuple_len = 4 * 17, _num_tuples = 17).to(DEVICE)
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-5)
         #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-2)
         self.criterion = torch.nn.MSELoss()
         self.LOSSES = []
     
@@ -41,7 +42,7 @@ class nTupleNewrok:
             k *= self.TARGET_PO2
         return n
 
-    def V(self, board, delta=None, debug=False, n_tuples = 17, tuple_length = 4):
+    def V(self, board, delta=None, debug=False, n_tuples = 17, total_tuple_length = 17*4):
         """Return the expected total future rewards of the board.
         Updates the LUTs if a delta is given and return the updated value.
         """
@@ -54,8 +55,8 @@ class nTupleNewrok:
         vals = []
         LUTS = []
         for tp in self.TUPLES:
-            #LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
-            LUTS.append(np.zeros((self.TARGET_PO2 + 1) * tuple_length))
+            LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
+            #LUTS.append(np.zeros((self.TARGET_PO2 + 1) * tuple_length))
         
         #print(len(LUTS), len(LUTS[0]), len(LUTS[1]))
         for i, (tp, LUT) in enumerate(zip(self.TUPLES, LUTS)):
@@ -123,13 +124,22 @@ class nTupleNewrok:
             print(e)
 
         #delta = r_next + v_after_next - self.V(s_after)
-        
+        VALUE_MAX = 10.0
         logits = torch.max(self.V(s_after))
         target = torch.tensor(r + v_after_next)
         #target = torch.sigmoid(target)
+        #target = torch.sigmoid(target) * VALUE_MAX
+        target = 1 / (1 + torch.exp(0.05 * -1 * target)) * VALUE_MAX
+        
+        
         #print(f"pred: {logits}, target : {target}")
         
         loss = self.criterion(logits.float(), target.float().to(DEVICE))
+        #loss *= 100.0
+        #loss += torch.mean(logits**2) + torch.mean(target**2)
+        loss += torch.mean(target**2) * (1 / VALUE_MAX)
+        #loss += (-1) * torch.std(target)
+        
         #loss = self.criterion(logits.float(), (r_next + v_next).float().to(DEVICE))
         self.LOSSES.append(loss)
         
