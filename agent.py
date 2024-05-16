@@ -10,14 +10,23 @@ DEVICE = "cuda:0"
 
 class nTupleNewrok:
     def __init__(self, tuples):
+        self.total_tuple_len = 0
+        for tp in tuples:  self.total_tuple_len += len(tp)
+        self.num_tuples = len(tuples)
+        
         self.TUPLES = tuples
         self.TARGET_PO2 = 15
         #self.LUTS = self.initialize_LUTS(self.TUPLES)
-        self.model = Model2048(_total_tuple_len = 4 * 17, _num_tuples = 17).to(DEVICE)
-        #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-5)
-        #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        #self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-1)
+        self.policy_net = Model2048(total_tuple_len = self.total_tuple_len, num_tuples = self.num_tuples).to(DEVICE)
+        self.target_net = Model2048(total_tuple_len = self.total_tuple_len, num_tuples = self.num_tuples).to(DEVICE)
+        
+        self.TARGET_UPDATE = 10000
+        
+        #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=5e-5)
+        #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
+        #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
+        #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-1)
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-4)
         self.criterion = torch.nn.MSELoss()
         self.LOSSES = []
     
@@ -42,7 +51,7 @@ class nTupleNewrok:
             k *= self.TARGET_PO2
         return n
 
-    def V(self, board, delta=None, debug=False, n_tuples = 17, total_tuple_length = 17*4):
+    def V(self, board, net="policy", delta=None, debug=False):
         """Return the expected total future rewards of the board.
         Updates the LUTs if a delta is given and return the updated value.
         """
@@ -55,7 +64,7 @@ class nTupleNewrok:
         vals = []
         LUTS = []
         for tp in self.TUPLES:
-            LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
+            LUTS.append(np.zeros((self.TARGET_PO2 + 1) * len(tp)))
             #LUTS.append(np.zeros((self.TARGET_PO2 + 1) * tuple_length))
         
         #print(len(LUTS), len(LUTS[0]), len(LUTS[1]))
@@ -68,7 +77,13 @@ class nTupleNewrok:
         
         state = torch.cat([torch.tensor(lut) for lut in LUTS], dim=0)
         
-        logits = self.model(state.to(DEVICE))
+        
+        #print(f"state: {state.shape}")
+        
+        if net == "policy":
+            logits = self.policy_net(state.to(DEVICE))
+        else: # "target"
+            logits = self.target_net(state.to(DEVICE))
         
         
         return logits
@@ -116,7 +131,7 @@ class nTupleNewrok:
         try:
             r_next = b.act(a_next)
             s_after_next = b.copyboard()
-            v_after_next = torch.max(self.V(s_after_next))
+            v_after_next = torch.max(self.V(s_after_next, net="target"))
             #v_next = torch.max(self.V(s_next))
         except IllegalAction:
             return
@@ -138,20 +153,26 @@ class nTupleNewrok:
         #loss *= 100.0
         #loss += torch.mean(logits**2) + torch.mean(target**2)
         loss += torch.mean(target**2) * (1 / VALUE_MAX)
-        #loss += (-1) * torch.std(target)
+        #loss += (-1) * torch.log(torch.std(target) + 1.0)
+        #loss += (-1) * torch.log(torch.std(self.V(s_after)) + 1.0) * (1 / VALUE_MAX)
+        
         
         #loss = self.criterion(logits.float(), (r_next + v_next).float().to(DEVICE))
         self.LOSSES.append(loss)
         
         self.optimizer.zero_grad()
         loss.backward()
-        for param in self.model.parameters():
-            param.grad.data.clamp_(-1, 1)
+        #for param in self.policy_net.parameters():
+        #    param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
         
-        if (total_steps+1) % 1000 == 0:
+        if (total_steps+1) % 10000 == 0:
             print(f"mean loss : {torch.mean(torch.tensor(self.LOSSES))}")
             self.LOSSES = []
+            
+        if total_steps % self.TARGET_UPDATE == 0:
+            self.target_net.load_state_dict(self.policy_net.state_dict())
+            print("target network updated")
 
         #if debug:
         #    print("s_next")

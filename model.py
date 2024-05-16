@@ -14,7 +14,6 @@ INPUT_SHAPE = (16, 4, 4)
 DEPTH_1 = 128
 DEPTH_2 = 256
 HIDDEN_UNITS = 512
-INITIAL_LR = 1e-4
 
 
 def init_weights(m):
@@ -24,30 +23,39 @@ def init_weights(m):
         
 class Model2048(nn.Module):
 
-    def __init__(self, _total_tuple_len = 4 * 17, _num_tuples = 17, max_values = 16, ACTION_SPACE=4, pretrained=False):
+    def __init__(self, total_tuple_len = 4 * 17, num_tuples = 17, max_values = 16, ACTION_SPACE=4, pretrained=False):
         super(Model2048, self).__init__()
         
         
-        total_tuple_len = _total_tuple_len
-        num_tuples = _num_tuples
+        print(f"total_tuple_len: {total_tuple_len},  num_tuples: {num_tuples}")
+        
         
         #self.Input_dim = int(num_tuples * (max_values * tuple_len))
         self.Input_dim = int(max_values * total_tuple_len)
-        self.H_dim1 = 64
-        #self.H_dim2 = 32
+        # self.H_dim1 = 1024
+        # self.H_dim2 = 512
+        # self.H_dim3 = 128
+        # self.H_dim4 = 64
+        
+        self.H_dim1 = 256
         self.H_dim2 = 128
-        #self.H_dim3 = 32
+        self.H_dim3 = 64
+        self.H_dim4 = 32    
+        
+        #print(f"input:  {self.Input_dim}")
         
         self.FC =  nn.Sequential(
             nn.Linear(self.Input_dim, self.H_dim1),
             nn.ReLU(),
             nn.Linear(self.H_dim1, self.H_dim2),
             nn.ReLU(),
-            #nn.Linear(self.H_dim2, self.H_dim3),
-            #nn.ReLU(),
+            nn.Linear(self.H_dim2, self.H_dim3),
+            nn.ReLU(),
+            nn.Linear(self.H_dim3, self.H_dim4),
+            nn.ReLU(),
             #nn.Linear(self.H_dim3, self.H_dim2),
             #nn.ReLU(),
-            nn.Linear(self.H_dim2, ACTION_SPACE),
+            nn.Linear(self.H_dim4, ACTION_SPACE),
             #nn.Linear(self.H_dim2, 1),
             #nn.Sigmoid(), ## TODO
             #nn.ReLU(),
@@ -55,6 +63,7 @@ class Model2048(nn.Module):
         self.FC.apply(init_weights)
         
     def forward(self, x):
+        
         VALUE_MAX = 10.0
         y = self.FC(x.reshape((-1, self.Input_dim)).float())
         #y = self.FC(x.reshape((-1, self.Input_dim)).float()) * VALUE_MAX
