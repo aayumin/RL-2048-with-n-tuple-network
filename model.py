@@ -31,7 +31,8 @@ class Model2048(nn.Module):
         
         
         #self.Input_dim = int(num_tuples * (max_values * tuple_len))
-        self.Input_dim = int(max_values * total_tuple_len)
+        #self.Input_dim = int(max_values * total_tuple_len)
+        self.Input_dim = int(total_tuple_len)
         self.H_dim1 = 256
         # self.H_dim2 = 512
         # self.H_dim3 = 128
