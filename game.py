@@ -64,6 +64,9 @@ class Board:
             self.board = board
         else:
             self.reset()
+            
+        self.epsilon = 0.9
+        self.cnt = 0
 
     def reset(self):
         self.clear()
@@ -105,6 +108,17 @@ class Board:
         return [2 ** v if v > 0 else 0 for v in self.board]
 
     def act(self, a):
+        self.cnt += 1
+        self.epsilon = max(0, self.epsilon - (self.cnt * 0.9 * 0.01))
+        
+        
+        ## epsilon-greedy
+        if random.random() < self.epsilon:
+            a == random.randint(0,3)
+            
+        ## various reward & negative reward
+        
+        
         original = self.board
         if a == LEFT:
             r = self.merge_to_left()

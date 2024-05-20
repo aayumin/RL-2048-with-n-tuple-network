@@ -32,41 +32,54 @@ class Model2048(nn.Module):
         
         #self.Input_dim = int(num_tuples * (max_values * tuple_len))
         self.Input_dim = int(max_values * total_tuple_len)
-        # self.H_dim1 = 1024
+        self.H_dim1 = 256
         # self.H_dim2 = 512
         # self.H_dim3 = 128
         # self.H_dim4 = 64
         
-        self.H_dim1 = 256
-        self.H_dim2 = 128
-        self.H_dim3 = 64
-        self.H_dim4 = 32    
+        # self.H_dim1 = 256
+        # self.H_dim2 = 128
+        # self.H_dim3 = 64
+        # self.H_dim4 = 32    
         
         #print(f"input:  {self.Input_dim}")
         
         self.FC =  nn.Sequential(
             nn.Linear(self.Input_dim, self.H_dim1),
             nn.ReLU(),
-            nn.Linear(self.H_dim1, self.H_dim2),
-            nn.ReLU(),
-            nn.Linear(self.H_dim2, self.H_dim3),
-            nn.ReLU(),
-            nn.Linear(self.H_dim3, self.H_dim4),
-            nn.ReLU(),
-            #nn.Linear(self.H_dim3, self.H_dim2),
-            #nn.ReLU(),
-            nn.Linear(self.H_dim4, ACTION_SPACE),
-            #nn.Linear(self.H_dim2, 1),
-            #nn.Sigmoid(), ## TODO
-            #nn.ReLU(),
+            # nn.Linear(self.H_dim1, self.H_dim2),
+            # nn.ReLU(),
+            # nn.Linear(self.H_dim2, self.H_dim3),
+            # nn.ReLU(),
+            # nn.Linear(self.H_dim3, self.H_dim4),
+            # nn.ReLU(),
         )
+        
+        self.baseline = nn.Sequential(
+            nn.Linear(self.H_dim1, 1),
+        )
+        
+        self.advantage = nn.Sequential(
+            nn.Linear(self.H_dim1, ACTION_SPACE),
+        )
+        
         self.FC.apply(init_weights)
+        self.baseline.apply(init_weights)
+        self.advantage.apply(init_weights)
         
     def forward(self, x):
         
         VALUE_MAX = 10.0
-        y = self.FC(x.reshape((-1, self.Input_dim)).float())
+        x = self.FC(x.reshape((-1, self.Input_dim)).float())
+        
+        y_baseline = self.baseline(x)
+        y_advantage = self.advantage(x)
         #y = self.FC(x.reshape((-1, self.Input_dim)).float()) * VALUE_MAX
-        y = 1 / (1 + torch.exp(0.05 * -1 * y)) * VALUE_MAX
+        #y = 1 / (1 + torch.exp(0.05 * -1 * y)) * VALUE_MAX
+        
+        y_baseline = 1 / (1 + torch.exp(0.05 * -1 * y_baseline)) * VALUE_MAX
+        y_advantage = 1 / (1 + torch.exp(0.05 * -1 * y_advantage)) * VALUE_MAX
+        
+        y = y_baseline + (y_advantage - torch.mean(y_advantage))
         return y
 

@@ -2,6 +2,9 @@ import numpy as np
 from game import Board
 from game import IllegalAction, GameOver
 from agent import nTupleNewrok
+import torch
+import matplotlib.pyplot as plt
+
 
 from tqdm import tqdm
 
@@ -22,6 +25,8 @@ Gameplay: A series of transitions on the board (transition_history). Also report
 Transition = namedtuple("Transition", "s, a, r, s_after, s_next")
 Gameplay = namedtuple("Gameplay", "transition_history game_reward max_tile")
 
+
+
 keymap = {0:"↑", 1: "→", 2: "↓" , 3:"←"}
 
 def play(agent, board, ep_idx, total_steps, spawn_random_tile=True):
@@ -33,7 +38,7 @@ def play(agent, board, ep_idx, total_steps, spawn_random_tile=True):
     transition_history = []
     while True:
         #time.sleep(0.2)
-        a_best, epsilon = agent.best_action(b.board, ep_idx)
+        a_best = agent.best_action(b.board, ep_idx)
         s = b.copyboard()
         #if (total_steps+1) % 1000 == 0: print(f"epsilon : {epsilon}")
         try:
@@ -46,10 +51,17 @@ def play(agent, board, ep_idx, total_steps, spawn_random_tile=True):
             s_after = b.copyboard()
             status = b.spawn_tile(random_tile=spawn_random_tile)
             s_next = b.copyboard()
-            if status == False: break
-        except (IllegalAction, GameOver) as e:
+            if status == False: 
+                r = -1 * 2 ** max(b.board)
+                break
+        except (IllegalAction) as e:
             # game ends when agent makes illegal moves or board is full
             r = None
+            s_after = None
+            s_next = None
+            break
+        except (GameOver) as e:
+            r = torch.tensor( -1 * 2 ** max(b.board))
             s_after = None
             s_next = None
             break
@@ -69,9 +81,26 @@ def play(agent, board, ep_idx, total_steps, spawn_random_tile=True):
 
 def learn_from_gameplay(agent, gp, ep_idx, total_steps, alpha=0.1):
     "Learn transitions in reverse order except the terminal transition"
+    REWARD_BACK_STEPS = 5
+    past_transitions = []
+    #total_steps = 0
+    
+    
     for i_step, tr in enumerate(gp.transition_history[:-1][::-1]):
         total_steps += 1
         agent.learn(ep_idx, total_steps, tr.s, tr.a, tr.r, tr.s_after, tr.s_next, alpha=alpha)
+        
+        ## TODO
+        past_transitions.append(tr)
+        if len(past_transitions) > REWARD_BACK_STEPS:
+            del past_transitions[0]
+        
+        ## TODO
+        GAMMA = 0.95
+        if i_step > 0:
+            for i in range(min(len(past_transitions), REWARD_BACK_STEPS)):
+                ptr = past_transitions[-1-i]
+                agent.learn(ep_idx, 0, ptr.s, ptr.a, ptr.r * GAMMA ** (i+1), ptr.s_after, ptr.s_next, alpha=alpha)
 
 
 def load_agent(path):
@@ -149,12 +178,16 @@ if __name__ == "__main__":
     n_session = 5000
     #n_episode = 100
     n_episode = 100
+    plot_mean_rewards = []
+    plot_max_tile = []
     print("training")
     try:
         total_steps = 0
         for i_se in range(n_session):
+            if n_games > 100000: break
             gameplays = []
             for i_ep in range(n_episode):
+                if n_games > 100000: break
                 gp, total_steps = play(agent, None, ep_idx = i_se, total_steps=total_steps, spawn_random_tile=True)
                 gameplays.append(gp)
                 n_games += 1
@@ -168,9 +201,38 @@ if __name__ == "__main__":
                     mean_gamerewards, mean_maxtile, n2048 / len(gameplays), maxtile
                 ),
             )
+            plot_mean_rewards.append(mean_gamerewards)
+            plot_max_tile.append(maxtile)
+            
+            if n_games > 100000:
+                print("{} games played by the agent. Terminate learning.  save plot and model".format(n_games))
+                plt.figure()
+                plt.plot(plot_mean_rewards, "r-")
+                plt.title("mean rewards")
+                plt.savefig("mean rewards.png")
+                
+                plt.figure()
+                plt.plot(plot_max_tile, "r-")
+                plt.title("max-tile")
+                plt.savefig("max-tile.png")
+                
+                fout = "tmp/{}_{}games.pkl".format(agent.__class__.__name__, n_games)
+                pickle.dump((n_games, agent), open(fout, "wb"))
+                print("agent saved to", fout)
+                
     except KeyboardInterrupt:
         print("training interrupted")
         print("{} games played by the agent".format(n_games))
+        if input("save the resulting plot? (y/n)") == "y":
+            plt.figure()
+            plt.plot(plot_mean_rewards, "r-")
+            plt.title("mean rewards")
+            plt.savefig("mean rewards.png")
+            
+            plt.figure()
+            plt.plot(plot_max_tile, "r-")
+            plt.title("max-tile")
+            plt.savefig("max-tile.png")
         if input("save the agent? (y/n)") == "y":
             fout = "tmp/{}_{}games.pkl".format(agent.__class__.__name__, n_games)
             pickle.dump((n_games, agent), open(fout, "wb"))
