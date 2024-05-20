@@ -16,11 +16,12 @@ class nTupleNewrok:
         
         self.TUPLES = tuples
         self.TARGET_PO2 = 15
-        #self.LUTS = self.initialize_LUTS(self.TUPLES)
+        self.LUTS = self.initialize_LUTS(self.TUPLES)
         self.policy_net = Model2048(total_tuple_len = self.total_tuple_len, num_tuples = self.num_tuples).to(DEVICE)
         self.target_net = Model2048(total_tuple_len = self.total_tuple_len, num_tuples = self.num_tuples).to(DEVICE)
         
-        self.TARGET_UPDATE = 10000
+        self.TARGET_UPDATE = 2000
+        self.PRINT_LOSS_INTERVAL = 5000
         
         #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=5e-5)
         #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
@@ -31,11 +32,13 @@ class nTupleNewrok:
         self.LOSSES = []
     
 
-    # def initialize_LUTS(self, tuples):
-    #     LUTS = []
-    #     for tp in tuples:
-    #         LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
-    #     return LUTS
+    def initialize_LUTS(self, tuples):
+        LUTS = []
+        for tp in tuples:
+            #LUTS.append(np.zeros((self.TARGET_PO2 + 1) ** len(tp)))
+            #LUTS.append(np.zeros((self.TARGET_PO2 + 1) * len(tp)))
+            LUTS.append(np.zeros(len(tp)))
+        return LUTS
 
     def tuple_id(self, values):
         values = values[::-1]
@@ -63,19 +66,27 @@ class nTupleNewrok:
             print(f"V({board})")
         vals = []
         LUTS = []
-        for tp in self.TUPLES:
-            LUTS.append(np.zeros((self.TARGET_PO2 + 1) * len(tp)))
+        # for tp in self.TUPLES:
+        #     LUTS.append(np.zeros((self.TARGET_PO2 + 1) * len(tp)))
             #LUTS.append(np.zeros((self.TARGET_PO2 + 1) * tuple_length))
+            
+        
+        vals = []
+        for i, (tp, LUT) in enumerate(zip(self.TUPLES, self.LUTS)):
+            tiles = [board[i] for i in tp]
+            vals.append(tiles)
+
         
         #print(len(LUTS), len(LUTS[0]), len(LUTS[1]))
-        for i, (tp, LUT) in enumerate(zip(self.TUPLES, LUTS)):
-            tiles = [board[ii] for ii in tp]
-            #tpid = self.tuple_id(tiles)
-            #print(tpid, end=", ")
-            #LUT[tpid] = 1
-            LUT = tiles
+        # for i, (tp, LUT) in enumerate(zip(self.TUPLES, LUTS)):
+        #     tiles = [board[ii] for ii in tp]
+        #     #tpid = self.tuple_id(tiles)
+        #     #print(tpid, end=", ")
+        #     #LUT[tpid] = 1
+        #     LUT = tiles
         
-        state = torch.cat([torch.tensor(lut) for lut in LUTS], dim=0)
+        #state = torch.cat([torch.tensor(lut) for lut in LUTS], dim=0)
+        state = torch.cat([torch.tensor(tp_values) for tp_values in vals], dim=0)
         
         
         #print(f"state: {state.shape}")
@@ -104,12 +115,12 @@ class nTupleNewrok:
         "returns the action with the highest expected total rewards on the state (s)"
         a_best = None
         r_best = -1
-        if steps == None: epsilon = 0.0
-        else: epsilon = max(0.00001, 0.05 - 0.01 * steps)
+        # if steps == None: epsilon = 0.0
+        # else: epsilon = max(0.00001, 0.05 - 0.01 * steps)
         
-        p = random.random()
-        if p < epsilon:
-            return random.randint(0,3), epsilon
+        # p = random.random()
+        # if p < epsilon:
+        #     return random.randint(0,3), epsilon
         #return torch.argmax(self.V(s)), epsilon
     
         for a in range(4):
@@ -117,7 +128,7 @@ class nTupleNewrok:
            if r > r_best:
                r_best = r
                a_best = a
-        return a_best, epsilon
+        return a_best
         
 
     def learn(self, ep_idx, total_steps, s, a, r, s_after, s_next, alpha=0.01, debug=False):
@@ -126,7 +137,7 @@ class nTupleNewrok:
         the belief on the next after state (s_after_next).
 
         """
-        a_next, _ = self.best_action(s_next, total_steps)
+        a_next = self.best_action(s_next)
         b = Board(s_next)
         try:
             r_next = b.act(a_next)
@@ -166,13 +177,13 @@ class nTupleNewrok:
         #    param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
         
-        if (total_steps+1) % 10000 == 0:
+        if (total_steps+1) % self.PRINT_LOSS_INTERVAL == 0:
             print(f"mean loss : {torch.mean(torch.tensor(self.LOSSES))}")
             self.LOSSES = []
             
-        if total_steps % self.TARGET_UPDATE == 0:
+        if total_steps != 0 and total_steps % self.TARGET_UPDATE == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
-            print("target network updated")
+            #print("target network updated")
 
         #if debug:
         #    print("s_next")
