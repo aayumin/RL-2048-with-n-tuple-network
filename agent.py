@@ -27,7 +27,7 @@ class nTupleNewrok:
         #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
         #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
         #self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-1)
-        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-4)
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=1e-3)
         self.criterion = torch.nn.MSELoss()
         self.LOSSES = []
     

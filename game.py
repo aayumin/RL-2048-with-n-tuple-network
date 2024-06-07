@@ -134,8 +134,8 @@ class Board:
         if original == self.board:
             raise IllegalAction("Action did not move any tile.")
             #return 0
-        #print(r)
-        return torch.tensor(math.log(r+1))
+        return r
+        #return torch.tensor(math.log(r+1))
 
     def rotate(self):
         "Rotate the board inplace 90 degress clockwise."

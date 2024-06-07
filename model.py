@@ -33,8 +33,8 @@ class Model2048(nn.Module):
         #self.Input_dim = int(num_tuples * (max_values * tuple_len))
         #self.Input_dim = int(max_values * total_tuple_len)
         self.Input_dim = int(total_tuple_len)
-        self.H_dim1 = 256
-        # self.H_dim2 = 512
+        self.H_dim1 = 100
+        self.H_dim2 = 32
         # self.H_dim3 = 128
         # self.H_dim4 = 64
         
@@ -48,20 +48,20 @@ class Model2048(nn.Module):
         self.FC =  nn.Sequential(
             nn.Linear(self.Input_dim, self.H_dim1),
             nn.ReLU(),
-            # nn.Linear(self.H_dim1, self.H_dim2),
-            # nn.ReLU(),
+            nn.Linear(self.H_dim1, self.H_dim2),
+            nn.ReLU(),
             # nn.Linear(self.H_dim2, self.H_dim3),
             # nn.ReLU(),
-            # nn.Linear(self.H_dim3, self.H_dim4),
+            # # nn.Linear(self.H_dim3, self.H_dim4),
             # nn.ReLU(),
         )
         
         self.baseline = nn.Sequential(
-            nn.Linear(self.H_dim1, 1),
+            nn.Linear(self.H_dim2, 1),
         )
         
         self.advantage = nn.Sequential(
-            nn.Linear(self.H_dim1, ACTION_SPACE),
+            nn.Linear(self.H_dim2, ACTION_SPACE),
         )
         
         self.FC.apply(init_weights)

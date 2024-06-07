@@ -107,6 +107,12 @@ def load_agent(path):
     return pickle.load(path.open("rb"))
 
 
+def save_csv(csv_data):
+    with open("result.csv", "w") as f:
+        for epi_data in csv_data:
+            line = ','.join(epi_data)
+            f.write(line + "\n")
+
 # map board state to LUT
 TUPLES = [
     # horizontal 4-tuples
@@ -147,11 +153,15 @@ TUPLES = [
     # [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15],
 ]
 
+
+
+
 if __name__ == "__main__":
     import numpy as np
 
     agent = None
     # prompt to load saved agents
+    csv_data = [["idx", "max_tile", "total_merge_rewards"]]
     from pathlib import Path
 
     path = Path("tmp")
@@ -191,6 +201,10 @@ if __name__ == "__main__":
                 gp, total_steps = play(agent, None, ep_idx = i_se, total_steps=total_steps, spawn_random_tile=True)
                 gameplays.append(gp)
                 n_games += 1
+                
+                epi_max_tile = gp.max_tile
+                epi_total_merge_rewards = gp.game_reward
+                csv_data.append([str(i_ep), str(epi_max_tile), str(epi_total_merge_rewards)])
             n2048 = sum([1 for gp in gameplays if gp.max_tile == 2048])
             mean_maxtile = np.mean([gp.max_tile for gp in gameplays])
             maxtile = max([gp.max_tile for gp in gameplays])
@@ -204,7 +218,7 @@ if __name__ == "__main__":
             plot_mean_rewards.append(mean_gamerewards)
             plot_max_tile.append(maxtile)
             
-            if n_games > 100000:
+            if n_games > 10000:
                 print("{} games played by the agent. Terminate learning.  save plot and model".format(n_games))
                 plt.figure()
                 plt.plot(plot_mean_rewards, "r-")
@@ -220,10 +234,14 @@ if __name__ == "__main__":
                 pickle.dump((n_games, agent), open(fout, "wb"))
                 print("agent saved to", fout)
                 
+                save_csv(csv_data)
+                
     except KeyboardInterrupt:
         print("training interrupted")
         print("{} games played by the agent".format(n_games))
-        if input("save the resulting plot? (y/n)") == "y":
+        if input("save the result data? (y/n)") == "y":
+            save_csv(csv_data)
+            
             plt.figure()
             plt.plot(plot_mean_rewards, "r-")
             plt.title("mean rewards")
@@ -233,7 +251,8 @@ if __name__ == "__main__":
             plt.plot(plot_max_tile, "r-")
             plt.title("max-tile")
             plt.savefig("max-tile.png")
-        if input("save the agent? (y/n)") == "y":
+            
+        if input("save the model weight? (y/n)") == "y":
             fout = "tmp/{}_{}games.pkl".format(agent.__class__.__name__, n_games)
             pickle.dump((n_games, agent), open(fout, "wb"))
             print("agent saved to", fout)
